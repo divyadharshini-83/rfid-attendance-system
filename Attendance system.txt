@@ -1,0 +1,123 @@
+#include <SPI.h>
+#include <MFRC522.h>
+
+#define SS_PIN 10
+#define RST_PIN 9
+
+MFRC522 mfrc522(SS_PIN, RST_PIN);
+
+// LED and Buzzer
+const int RedLed = 6;
+const int GreenLed = 5;
+const int Buzzer = 8;
+
+// Structure to store student details
+struct Student {
+  byte uid[4];
+  String name;
+  int id;
+  bool attendance;
+};
+
+// Student Database
+Student students[] = {
+  {{0x99,0x35,0x72,0xA9},"Divyadharshini",101,false},
+  {{0x8B,0x25,0x8F,0xB9},"Student2",102,false},
+  {{0x11,0x22,0x33,0x44},"Student3",103,false}
+};
+
+int totalStudents = 3;
+
+void setup()
+{
+  Serial.begin(9600);
+  SPI.begin();
+  mfrc522.PCD_Init();
+
+  pinMode(RedLed,OUTPUT);
+  pinMode(GreenLed,OUTPUT);
+  pinMode(Buzzer,OUTPUT);
+
+  Serial.println("RFID Attendance System Ready");
+}
+
+void loop()
+{
+
+  if (!mfrc522.PICC_IsNewCardPresent())
+  return;
+
+  if (!mfrc522.PICC_ReadCardSerial())
+  return;
+
+  byte readUID[4];
+
+  for(byte i=0;i<4;i++)
+  {
+    readUID[i]=mfrc522.uid.uidByte[i];
+  }
+
+  bool matchFound=false;
+
+  for(int i=0;i<totalStudents;i++)
+  {
+    bool match=true;
+
+    for(int j=0;j<4;j++)
+    {
+      if(readUID[j]!=students[i].uid[j])
+      {
+        match=false;
+        break;
+      }
+    }
+
+    if(match)
+    {
+      matchFound=true;
+
+      if(!students[i].attendance)
+      {
+        students[i].attendance=true;
+
+        Serial.print("Attendance Marked: ");
+        Serial.print(students[i].name);
+        Serial.print(" ID: ");
+        Serial.println(students[i].id);
+
+        digitalWrite(GreenLed,HIGH);
+        digitalWrite(RedLed,LOW);
+
+        digitalWrite(Buzzer,HIGH);
+        delay(200);
+        digitalWrite(Buzzer,LOW);
+
+      }
+      else
+      {
+        Serial.println("Attendance Already Marked");
+
+        digitalWrite(RedLed,HIGH);
+        delay(1000);
+        digitalWrite(RedLed,LOW);
+      }
+
+      break;
+    }
+  }
+
+  if(!matchFound)
+  {
+    Serial.println("Unauthorized Card");
+
+    digitalWrite(RedLed,HIGH);
+
+    digitalWrite(Buzzer,HIGH);
+    delay(500);
+    digitalWrite(Buzzer,LOW);
+
+    digitalWrite(RedLed,LOW);
+  }
+
+  delay(2000);
+}
